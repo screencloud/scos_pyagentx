@@ -3,16 +3,21 @@
 
 # --------------------------------------------
 import logging
+
+
 class NullHandler(logging.Handler):
     def emit(self, record):
         pass
-logger = logging.getLogger('pyagentx.network')
+
+
+logger = logging.getLogger("pyagentx.network")
 logger.addHandler(NullHandler())
 # --------------------------------------------
 
 import socket
 import time
 import threading
+
 try:
     import queue
 except ImportError:
@@ -23,8 +28,7 @@ from pyagentx.pdu import PDU
 
 
 class Network(threading.Thread):
-
-    def __init__(self, queue, oid_list, sethandlers):
+    def __init__(self, queue, oid_list, sethandlers, sockloc=None):
         threading.Thread.__init__(self)
         self.stop = threading.Event()
         self._queue = queue
@@ -35,14 +39,15 @@ class Network(threading.Thread):
         self.transaction_id = 0
         self.debug = 1
         # Data Related Variables
-        self.data = {}        
+        self.data = {}
         self.data_idx = []
+        self.sock_loc = sockloc or pyagentx.SOCKET_PATH
 
     def _connect(self):
         while True:
             try:
-                self.socket = socket.socket( socket.AF_UNIX, socket.SOCK_STREAM )
-                self.socket.connect(pyagentx.SOCKET_PATH)
+                self.socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                self.socket.connect(self.sock_loc)
                 self.socket.settimeout(0.1)
                 return
             except socket.error:
@@ -64,71 +69,77 @@ class Network(threading.Thread):
         return pdu
 
     def send_pdu(self, pdu):
-        if self.debug: pdu.dump()
+        if self.debug:
+            pdu.dump()
         self.socket.send(pdu.encode())
-        
+
     def recv_pdu(self):
         buf = self.socket.recv(1024)
-        if not buf: return None
+        if not buf:
+            return None
         pdu = PDU()
         pdu.decode(buf)
-        if self.debug: pdu.dump()
+        if self.debug:
+            pdu.dump()
         return pdu
 
-
     # =========================================
-
 
     def _get_updates(self):
         while True:
             try:
                 item = self._queue.get_nowait()
-                logger.debug('New update')
-                update_oid = item['oid']
-                update_data = item['data']
+                logger.debug("New update")
+                update_oid = item["oid"]
+                update_data = item["data"]
                 # clear values with prefix oid
                 for oid in list(self.data.keys()):
                     if oid.startswith(update_oid):
-                        del(self.data[oid])
+                        del self.data[oid]
                 # insert updated value
                 for row in list(update_data.values()):
-                    oid = "%s.%s" % (update_oid, row['name'])
-                    self.data[oid] = {'name': oid, 'type':row['type'],
-                                      'value':row['value']}
+                    oid = "%s.%s" % (update_oid, row["name"])
+                    self.data[oid] = {
+                        "name": oid,
+                        "type": row["type"],
+                        "value": row["value"],
+                    }
                 # recalculate reverse index if data changed
-                self.data_idx = sorted(list(self.data.keys()), key=lambda k: tuple(int(part) for part in k.split('.')))
+                self.data_idx = sorted(
+                    list(self.data.keys()),
+                    key=lambda k: tuple(int(part) for part in k.split(".")),
+                )
             except queue.Empty:
                 break
-
 
     def _get_next_oid(self, oid, endoid):
         if oid in self.data:
             # Exact match found
-            #logger.debug('get_next_oid, exact match of %s' % oid)
+            # logger.debug('get_next_oid, exact match of %s' % oid)
             idx = self.data_idx.index(oid)
-            if idx == (len(self.data_idx)-1):
+            if idx == (len(self.data_idx) - 1):
                 # Last Item in MIB, No match!
                 return None
-            return self.data_idx[idx+1]
+            return self.data_idx[idx + 1]
         else:
             # No exact match, find prefix
-            #logger.debug('get_next_oid, no exact match of %s' % oid)
-            slist = oid.split('.')
-            elist = endoid.split('.')
+            # logger.debug('get_next_oid, no exact match of %s' % oid)
+            slist = oid.split(".")
+            elist = endoid.split(".")
             for tmp_oid in self.data_idx:
-                tlist = tmp_oid.split('.')
+                tlist = tmp_oid.split(".")
                 for i in range(len(tlist)):
                     try:
                         sok = int(slist[i]) <= int(tlist[i])
                         eok = int(elist[i]) >= int(tlist[i])
-                        if not ( sok and eok ):
+                        if not (sok and eok):
                             break
                     except IndexError:
                         pass
                 if sok and eok:
                     return tmp_oid
-            return None # No match!
-    
+            return None  # No match!
+
     def start(self):
         while True:
             try:
@@ -181,47 +192,62 @@ class Network(threading.Thread):
                         response.values.append(self.data[oid])
                     else:
                         logger.debug("OID Not Found!")
-                        response.values.append({'type':pyagentx.TYPE_NOSUCHOBJECT, 'name':rvalue[0], 'value':0})
+                        response.values.append(
+                            {
+                                "type": pyagentx.TYPE_NOSUCHOBJECT,
+                                "name": rvalue[0],
+                                "value": 0,
+                            }
+                        )
 
             elif request.type == pyagentx.AGENTX_GETNEXT_PDU:
                 logger.info("Received GET_NEXT PDU")
                 for rvalue in request.range_list:
-                    oid = self._get_next_oid(rvalue[0],rvalue[1])
+                    oid = self._get_next_oid(rvalue[0], rvalue[1])
                     logger.debug("GET_NEXT: %s => %s" % (rvalue[0], oid))
                     if oid:
                         response.values.append(self.data[oid])
                     else:
-                        response.values.append({'type':pyagentx.TYPE_ENDOFMIBVIEW, 'name':rvalue[0], 'value':0})
+                        response.values.append(
+                            {
+                                "type": pyagentx.TYPE_ENDOFMIBVIEW,
+                                "name": rvalue[0],
+                                "value": 0,
+                            }
+                        )
 
             elif request.type == pyagentx.AGENTX_TESTSET_PDU:
                 logger.info("Received TESTSET PDU")
                 idx = 0
                 for row in request.values:
                     idx += 1
-                    oid = row['name']
-                    type_ = pyagentx.TYPE_NAME.get(row['type'], 'Unknown type')
-                    value = row['data']
-                    logger.info("Name: [%s] Type: [%s] Value: [%s]" % (oid, type_, value))
+                    oid = row["name"]
+                    type_ = pyagentx.TYPE_NAME.get(row["type"], "Unknown type")
+                    value = row["data"]
+                    logger.info(
+                        "Name: [%s] Type: [%s] Value: [%s]" % (oid, type_, value)
+                    )
                     # Find matching sethandler
-                    matching_oid = ''
+                    matching_oid = ""
                     for target_oid in self._sethandlers:
                         if oid.startswith(target_oid):
                             matching_oid = target_oid
                             break
-                    if matching_oid == '':
-                        logger.debug('TestSet request failed: not writeable #%s' % idx)
+                    if matching_oid == "":
+                        logger.debug("TestSet request failed: not writeable #%s" % idx)
                         response.error = pyagentx.ERROR_NOTWRITABLE
                         response.error_index = idx
                         break
                     try:
-                        self._sethandlers[matching_oid].network_test(request.session_id, request.transaction_id, oid, row['data'])
+                        self._sethandlers[matching_oid].network_test(
+                            request.session_id, request.transaction_id, oid, row["data"]
+                        )
                     except pyagentx.SetHandlerError:
-                        logger.debug('TestSet request failed: wrong value #%s' % idx)
+                        logger.debug("TestSet request failed: wrong value #%s" % idx)
                         response.error = pyagentx.ERROR_WRONGVALUE
                         response.error_index = idx
                         break
-                logger.debug('TestSet request passed')
-
+                logger.debug("TestSet request passed")
 
             elif request.type == pyagentx.AGENTX_COMMITSET_PDU:
                 for handler in list(self._sethandlers.values()):
@@ -239,5 +265,3 @@ class Network(threading.Thread):
                 logger.info("Received CLEANUP PDU")
 
             self.send_pdu(response)
-
-

@@ -7,40 +7,44 @@ from pyagentx.updater import Updater
 from pyagentx.agent import Agent
 from pyagentx.sethandler import SetHandler, SetHandlerError
 
+
 def setup_logging(debug=False):
     if debug:
         level = logging.DEBUG
     else:
-        level = logging.INFO
-    logger = logging.getLogger('pyagentx')
+        level = logging.CRITICAL
+    logger = logging.getLogger("pyagentx")
     logger.setLevel(level)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
     ch = logging.StreamHandler()
     ch.setLevel(level)
     ch.setFormatter(formatter)
     logger.addHandler(ch)
 
+
 SOCKET_PATH = "/var/agentx/master"
 
-AGENTX_EMPTY_PDU            = 1
-AGENTX_OPEN_PDU             = 1
-AGENTX_CLOSE_PDU            = 2
-AGENTX_REGISTER_PDU         = 3
-AGENTX_UNREGISTER_PDU       = 4
-AGENTX_GET_PDU              = 5
-AGENTX_GETNEXT_PDU          = 6
-AGENTX_GETBULK_PDU          = 7
-AGENTX_TESTSET_PDU          = 8
-AGENTX_COMMITSET_PDU        = 9
-AGENTX_UNDOSET_PDU         = 10
-AGENTX_CLEANUPSET_PDU      = 11
-AGENTX_NOTIFY_PDU          = 12
-AGENTX_PING_PDU            = 13
-AGENTX_INDEXALLOCATE_PDU   = 14
+AGENTX_EMPTY_PDU = 1
+AGENTX_OPEN_PDU = 1
+AGENTX_CLOSE_PDU = 2
+AGENTX_REGISTER_PDU = 3
+AGENTX_UNREGISTER_PDU = 4
+AGENTX_GET_PDU = 5
+AGENTX_GETNEXT_PDU = 6
+AGENTX_GETBULK_PDU = 7
+AGENTX_TESTSET_PDU = 8
+AGENTX_COMMITSET_PDU = 9
+AGENTX_UNDOSET_PDU = 10
+AGENTX_CLEANUPSET_PDU = 11
+AGENTX_NOTIFY_PDU = 12
+AGENTX_PING_PDU = 13
+AGENTX_INDEXALLOCATE_PDU = 14
 AGENTX_INDEXDEALLOCATE_PDU = 15
-AGENTX_ADDAGENTCAPS_PDU    = 16
+AGENTX_ADDAGENTCAPS_PDU = 16
 AGENTX_REMOVEAGENTCAPS_PDU = 17
-AGENTX_RESPONSE_PDU        = 18
+AGENTX_RESPONSE_PDU = 18
 
 PDU_TYPE_NAME = {}
 PDU_TYPE_NAME[0] = "EMPTY_PDU"
@@ -62,7 +66,6 @@ PDU_TYPE_NAME[15] = "INDEXDEALLOCATE_PDU"
 PDU_TYPE_NAME[16] = "ADDAGENTCAPS_PDU"
 PDU_TYPE_NAME[17] = "REMOVEAGENTCAPS_PDU"
 PDU_TYPE_NAME[18] = "RESPONSE_PDU"
-
 
 
 TYPE_INTEGER = 2
@@ -93,7 +96,6 @@ TYPE_NAME[70] = "COUNTER64"
 TYPE_NAME[128] = "NOSUCHOBJECT"
 TYPE_NAME[129] = "NOSUCHINSTANCE"
 TYPE_NAME[130] = "ENDOFMIBVIEW"
-
 
 
 ERROR_NOAGENTXERROR = 0
@@ -152,4 +154,3 @@ ERROR_NAMES[265] = "UNKNOWNAGENTCAPS"
 ERROR_NAMES[266] = "PARSEERROR"
 ERROR_NAMES[267] = "REQUESTDENIED"
 ERROR_NAMES[268] = "PROCESSINGERROR"
-
